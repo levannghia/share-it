@@ -1,13 +1,22 @@
-import { View, Text } from 'react-native'
-import React from 'react'
+import { View, Text, Platform, StatusBar } from 'react-native'
+import React, { useEffect } from 'react'
 import { ActivityIndicator, MD2Colors } from 'react-native-paper'
+import Navigation from './src/navigation/Navigation'
+import { requestPhotoPermission } from './src/utils/Constants'
+import { checkFilePermissions } from './src/utils/libraryHelpers'
 
 const App = () => {
+
+  useEffect(() => {
+    requestPhotoPermission();
+    checkFilePermissions(Platform.OS);
+  }, [])
+
   return (
-    <View>
-      <Text>App</Text>
-      <ActivityIndicator animating={true} color={MD2Colors.red800} />
-    </View>
+    <>
+      <StatusBar translucent barStyle={'dark-content'} backgroundColor={'transparent'} />
+      <Navigation />
+    </>
   )
 }
 

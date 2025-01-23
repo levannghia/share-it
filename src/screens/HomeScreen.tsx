@@ -5,6 +5,8 @@ import HomeHeader from '../components/home/HomeHeader'
 import ContainerView from '../components/global/ContainerView'
 import SendReceiveButton from '../components/home/SendReceiveButton'
 import Options from '../components/home/Options'
+import Misc from '../components/home/Misc'
+import AbsoluteQRBottom from '../components/home/AbsoluteQRBottom'
 
 const HomeScreen: FC = () => {
     return (
@@ -17,7 +19,9 @@ const HomeScreen: FC = () => {
                 >
                     <SendReceiveButton/>
                     <Options isHome/>
+                    <Misc/>
                 </ScrollView>
+                <AbsoluteQRBottom/>
             </View>
         </ContainerView>
 

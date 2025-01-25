@@ -81,7 +81,7 @@ const QRScannerModal: FC<ModalProps> = ({ visible, onClose }) => {
                 <View style={modalStyles.qrContainer}>
                     {loading ? (
                         <View style={modalStyles.skeleton}>
-                            <Animated.View>
+                            <Animated.View style={[modalStyles.shimmerOverlay, shimmerStyle]}>
                                 <LinearGradient
                                     colors={['#f3f3f3', '#fff', '#f3f3f3']}
                                     start={{x: 0, y: 0}}

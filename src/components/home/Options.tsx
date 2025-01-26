@@ -4,6 +4,7 @@ import { optionStyles } from '../../styles/optionsStyles'
 import Icon from '../global/Icon'
 import { Colors } from '../../utils/Constants'
 import CustomText from '../global/CustomText'
+import { useTCP } from '../../service/TCPProvider'
 
 const Options: FC<{
     isHome?: boolean,
@@ -11,8 +12,15 @@ const Options: FC<{
     onFilePickedUp?: (file: any) => void,
 }> = ({ isHome, onFilePickedUp, onMediaPickedUp }) => {
 
-    const handleUniversalPicker = async (type: string) => {
+    const {isConnected, startServer} = useTCP()
 
+    const handleUniversalPicker = async (type: string) => {
+        startServer(12);
+        if(isConnected) {
+            console.log("ket noi tc");
+        } else {
+            console.log("ket noi that bai");
+        }
     }
 
     return (

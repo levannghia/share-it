@@ -6,6 +6,7 @@ import { Alert, Platform } from 'react-native';
 import RNFS from 'react-native-fs';
 import {v4 as uuid} from 'uuid';
 import { produce, Producer } from 'immer';
+import { receiveChunkAck, receiveFileAck, sendChunkAck } from './TCPUntils';
 
 interface TCPContextType {
     server: any;
@@ -70,6 +71,18 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({ children }) => 
                     setConnectedDevice(parsedData?.deviceName)
                 }
 
+                if(parsedData?.event === 'file_ack'){
+                    receiveFileAck(parsedData?.file, socket, setReceivedFiles);
+                }
+
+                if(parsedData?.event === 'send_chunk_ack'){
+                    sendChunkAck(parsedData?.chunkNo, socket, setTotalReceivedBytes, setSentFiles);
+                }
+
+                if(parsedData?.event === 'receive_chunk_ack'){
+                    receiveChunkAck(parsedData?.chunk, parsedData?.chunkNo, socket, setTotalReceivedBytes, generateFile);
+                }
+
             });
             socket.on('close', () => {
                 console.log("client disconnect");
@@ -115,7 +128,17 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({ children }) => 
 
         newClient.on('data', async (data) => {
             const parsedData = JSON.parse(data?.toString());
+            if(parsedData?.event === 'file_ack'){
+                receiveFileAck(parsedData?.file, newClient, setReceivedFiles);
+            }
 
+            if(parsedData?.event === 'send_chunk_ack'){
+                sendChunkAck(parsedData?.chunkNo, newClient, setTotalReceivedBytes, setSentFiles);
+            }
+
+            if(parsedData?.event === 'receive_chunk_ack'){
+                receiveChunkAck(parsedData?.chunk, parsedData?.chunkNo, newClient, setTotalReceivedBytes, generateFile);
+            }
         })
 
         newClient.on('close', () => {
@@ -220,6 +243,48 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({ children }) => 
             socket.write(JSON.stringify({event: 'file_ack', file: rawData}))
         } catch (error) {
             console.log("Error sending file: ", error);
+        }
+    }
+
+    //GENERATE FILE
+
+    const generateFile = async () => {
+        const {chunkStore, resetChunkStore} = useChunkStore.getState();
+        if(!chunkStore) {
+            console.log("No chunks or files to proccess");
+            return
+        }
+
+        if(chunkStore?.totalChunk !== chunkStore.chunkArray.length) {
+            console.error("Not all chunks have been received.");
+            return
+        }
+
+        try {
+            const combinedChunks = Buffer.concat(chunkStore.chunkArray);
+            const platformPath = Platform.OS === 'ios' ? `${RNFS.DownloadDirectoryPath}` : `${RNFS.DocumentDirectoryPath}`;
+            const filePath = `${platformPath}/${chunkStore.name}`;
+
+            await RNFS.writeFile(filePath, combinedChunks?.toString('base64'), 'base64');
+            setReceivedFiles((prevFiles: any) => 
+                produce(prevFiles, (draftFiles: any) => {
+                    const fileIndex = draftFiles?.findIndex((f: any) => f.id === chunkStore.id);
+
+                    if(fileIndex !== -1) {
+                        draftFiles[fileIndex] = {
+                            ...draftFiles[fileIndex],
+                            uri: filePath,
+                            available: true
+                        }
+                    }
+                })
+            )
+
+            console.log("FILE SAVED SUCCESSFULLY", filePath);
+            
+        } catch (error) {
+            console.error("Error combining chunks or saving file:", error);
+            
         }
     }
 

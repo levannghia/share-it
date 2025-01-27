@@ -5,6 +5,8 @@ import Icon from '../global/Icon'
 import { Colors } from '../../utils/Constants'
 import CustomText from '../global/CustomText'
 import { useTCP } from '../../service/TCPProvider'
+import { navigate } from '../../utils/NavigationUtil'
+import { pickDocument, pickImage } from '../../utils/libraryHelpers'
 
 const Options: FC<{
     isHome?: boolean,
@@ -15,11 +17,22 @@ const Options: FC<{
     const {isConnected, startServer} = useTCP()
 
     const handleUniversalPicker = async (type: string) => {
-        startServer(12);
-        if(isConnected) {
-            console.log("ket noi tc");
-        } else {
-            console.log("ket noi that bai");
+        if(isHome) {
+            if(isConnected) {
+                navigate("ConnectionScreen");
+            } else {
+                navigate("SendScreen");
+            }
+
+            return
+        }
+
+        if(type === 'images' && onMediaPickedUp) {
+            pickImage(onMediaPickedUp)
+        }
+
+        if(type === 'file' && onFilePickedUp) {
+            pickDocument(onFilePickedUp)
         }
     }
 

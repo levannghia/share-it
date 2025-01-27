@@ -3,12 +3,15 @@ import React, { FC, useEffect, useMemo, useState } from 'react'
 import { modalStyles } from '../../styles/modalStyles';
 import Icon from '../global/Icon';
 import CustomText from '../global/CustomText';
-import {Camera, CodeScanner, useCameraDevice} from 'react-native-vision-camera';
+import { Camera, CodeScanner, useCameraDevice } from 'react-native-vision-camera';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient'
 import QRCode from 'react-native-qrcode-svg';
 import { multiColor } from '../../utils/Constants';
 import DeviceInfo from 'react-native-device-info';
+import { useTCP } from '../../service/TCPProvider';
+import { navigate } from '../../utils/NavigationUtil';
+import { getLocalIPAddress } from '../../utils/networkUtils';
 
 interface ModalProps {
     visible: boolean,
@@ -16,33 +19,53 @@ interface ModalProps {
 }
 
 const QRGenerateModal: FC<ModalProps> = ({ visible, onClose }) => {
+    const { isConnected, startServer, server } = useTCP();
     const [loading, setLoading] = useState(true);
     const [qrValue, setQRValue] = useState('saaaaaa');
     const shimmerTranslateX = useSharedValue(-300);
 
     const shimmerStyle = useAnimatedStyle(() => ({
-        transform: [{translateX: shimmerTranslateX.value}],
+        transform: [{ translateX: shimmerTranslateX.value }],
     }))
 
     const setupServer = async () => {
-        const deviceName  = await DeviceInfo.getDeviceName();
+        const deviceName = await DeviceInfo.getDeviceName();
+        const ip = await getLocalIPAddress();
+        const port = 4000;
+
+        if (server) {
+            setQRValue(`tcp://${ip}:${port}|${deviceName}`);
+            setLoading(false);
+            return
+        }
+
+        startServer(port);
+        setQRValue(`tcp://${ip}:${port}|${deviceName}`);
+        console.log(`Server Info: ${ip}:${port}`);
         setLoading(false);
-        console.log(deviceName);
-        
     }
 
     useEffect(() => {
         shimmerTranslateX.value = withRepeat(
-            withTiming(300, {duration: 1500, easing: Easing.linear}),
+            withTiming(300, { duration: 1500, easing: Easing.linear }),
             -1,
             false
         )
 
-        if(visible) {
+        if (visible) {
             setLoading(true);
             setupServer()
         }
     }, [visible])
+
+    useEffect(() => {
+        console.log("TCPProvider: isConnected updated to", isConnected);
+        if (isConnected) {
+            onClose();
+            navigate('ConnectionScreen');
+        }
+
+    }, [isConnected])
 
 
     return (
@@ -60,8 +83,8 @@ const QRGenerateModal: FC<ModalProps> = ({ visible, onClose }) => {
                             <Animated.View style={[modalStyles.shimmerOverlay, shimmerStyle]}>
                                 <LinearGradient
                                     colors={['#f3f3f3', '#fff', '#f3f3f3']}
-                                    start={{x: 0, y: 0}}
-                                    end={{x: 0, y: 0}}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 0, y: 0 }}
                                     style={modalStyles.shimmerGradient}
                                 />
                             </Animated.View>

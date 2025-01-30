@@ -4,7 +4,7 @@ import TCPSocket from 'react-native-tcp-socket';
 import DeviceInfo from 'react-native-device-info';
 import { Alert, Platform } from 'react-native';
 import RNFS from 'react-native-fs';
-import {v4 as uuid} from 'uuid';
+import { v4 as uuid } from 'uuid';
 import { produce, Producer } from 'immer';
 import { receiveChunkAck, receiveFileAck, sendChunkAck } from './TCPUntils';
 
@@ -47,9 +47,19 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({ children }) => 
     const [totalReceivedBytes, setTotalReceivedBytes] = useState<number>(0);
 
     const { currentChunkSet, setCurrentChunkSet, chunkStore, setChunkStore } = useChunkStore();
-    const option = {
-        keystore: require('../../tls_certs/server-keystore.p12')
-    }
+
+    // const options = {
+    //     keystore: require('../../tls_certs/server-keystore.p12')
+    // }
+
+    const options = {
+        port: 4000,
+        host: '0.0.0.0',
+        localAddress: '10.0.2.2',
+        reuseAddress: true,
+        // localPort: 20000,
+        // interface: "wifi",
+    };
     //START SERVER
     const startServer = useCallback((port: number) => {
         if (server) {
@@ -57,7 +67,7 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({ children }) => 
             return;
         }
 
-        const newServer = TCPSocket.createTLSServer(option, (socket) => {
+        const newServer = TCPSocket.createServer((socket) => {
             console.log("Client Connected: ", socket.address());
             setServerSocket(socket);
             socket.setNoDelay(true);
@@ -71,15 +81,15 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({ children }) => 
                     setConnectedDevice(parsedData?.deviceName)
                 }
 
-                if(parsedData?.event === 'file_ack'){
+                if (parsedData?.event === 'file_ack') {
                     receiveFileAck(parsedData?.file, socket, setReceivedFiles);
                 }
 
-                if(parsedData?.event === 'send_chunk_ack'){
+                if (parsedData?.event === 'send_chunk_ack') {
                     sendChunkAck(parsedData?.chunkNo, socket, setTotalReceivedBytes, setSentFiles);
                 }
 
-                if(parsedData?.event === 'receive_chunk_ack'){
+                if (parsedData?.event === 'receive_chunk_ack') {
                     receiveChunkAck(parsedData?.chunk, parsedData?.chunkNo, socket, setTotalReceivedBytes, generateFile);
                 }
 
@@ -110,12 +120,19 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({ children }) => 
 
     //Start Client
     const connectToServer = useCallback((host: string, port: number, deviceName: string) => {
-        const newClient = TCPSocket.connectTLS({
-            host,
-            port,
-            cert: true,
-            ca: require('../../tls_certs/server-csr.pem')
-        }, () => {
+        // const newClient = TCPSocket.createConnection({
+        //     host,
+        //     port,
+        //     cert: true,
+        //     ca: require('../../tls_certs/server-csr.pem')
+        // }, () => {
+        //     setIsConnected(true);
+        //     setConnectedDevice(deviceName);
+        //     const myDeviceName = DeviceInfo.getDeviceNameSync();
+        //     newClient.write(JSON.stringify({ event: 'connect', deviceName: myDeviceName }))
+        // });
+
+        const newClient = TCPSocket.createConnection(options, () => {
             setIsConnected(true);
             setConnectedDevice(deviceName);
             const myDeviceName = DeviceInfo.getDeviceNameSync();
@@ -128,15 +145,15 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({ children }) => 
 
         newClient.on('data', async (data) => {
             const parsedData = JSON.parse(data?.toString());
-            if(parsedData?.event === 'file_ack'){
+            if (parsedData?.event === 'file_ack') {
                 receiveFileAck(parsedData?.file, newClient, setReceivedFiles);
             }
 
-            if(parsedData?.event === 'send_chunk_ack'){
+            if (parsedData?.event === 'send_chunk_ack') {
                 sendChunkAck(parsedData?.chunkNo, newClient, setTotalReceivedBytes, setSentFiles);
             }
 
-            if(parsedData?.event === 'receive_chunk_ack'){
+            if (parsedData?.event === 'receive_chunk_ack') {
                 receiveChunkAck(parsedData?.chunk, parsedData?.chunkNo, newClient, setTotalReceivedBytes, generateFile);
             }
         })
@@ -150,7 +167,7 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({ children }) => 
             setChunkStore(null);
             setIsConnected(false);
             disconnect();
-            
+
         })
 
         newClient.on('error', (err) => console.error("Client Error: ", err));
@@ -160,11 +177,11 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({ children }) => 
     //disconnect
 
     const disconnect = useCallback(() => {
-        if(client) {
+        if (client) {
             client.destroy();
         }
 
-        if(server) {
+        if (server) {
             server.close();
         }
 
@@ -179,20 +196,20 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({ children }) => 
     //Send Message
 
     const sendMessage = useCallback((message: string | Buffer) => {
-        if(client) {
+        if (client) {
             client.write(JSON.stringify(message));
             console.log('send from client: ', message);
-        } else if(server) {
+        } else if (server) {
             serverSocket.write(JSON.stringify(message));
             console.log('send from server: ', message);
         } else {
             console.log("No client or server socket available");
-            
+
         }
     }, [server, client])
 
     const sendFileAck = async (file: any, type: 'image' | 'file') => {
-        if(currentChunkSet != null) {
+        if (currentChunkSet != null) {
             Alert.alert("Wait for current file to be sent!");
             return;
         }
@@ -200,12 +217,12 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({ children }) => 
         const normalizedPath = Platform.OS === 'ios' ? file?.url?.replace('file://', '') : file?.uri;
         const fileData = await RNFS.readFile(normalizedPath, 'base64');
         const buffer = Buffer.from(fileData, 'base64');
-        const  CHUNK_SIZE = 1024 * 8;
+        const CHUNK_SIZE = 1024 * 8;
         let totalChunks = 0;
         let offset = 0;
         let chunkArray = [];
 
-        while(offset < buffer.length) {
+        while (offset < buffer.length) {
             const chunk = buffer.slice(offset, offset * CHUNK_SIZE);
             totalChunks += 1;
             chunkArray.push(chunk);
@@ -236,11 +253,11 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({ children }) => 
         })
 
         const socket = client || server;
-        if(!socket) return;
+        if (!socket) return;
 
         try {
             console.log("FILE ACK");
-            socket.write(JSON.stringify({event: 'file_ack', file: rawData}))
+            socket.write(JSON.stringify({ event: 'file_ack', file: rawData }))
         } catch (error) {
             console.log("Error sending file: ", error);
         }
@@ -249,13 +266,13 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({ children }) => 
     //GENERATE FILE
 
     const generateFile = async () => {
-        const {chunkStore, resetChunkStore} = useChunkStore.getState();
-        if(!chunkStore) {
+        const { chunkStore, resetChunkStore } = useChunkStore.getState();
+        if (!chunkStore) {
             console.log("No chunks or files to proccess");
             return
         }
 
-        if(chunkStore?.totalChunk !== chunkStore.chunkArray.length) {
+        if (chunkStore?.totalChunk !== chunkStore.chunkArray.length) {
             console.error("Not all chunks have been received.");
             return
         }
@@ -266,11 +283,11 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({ children }) => 
             const filePath = `${platformPath}/${chunkStore.name}`;
 
             await RNFS.writeFile(filePath, combinedChunks?.toString('base64'), 'base64');
-            setReceivedFiles((prevFiles: any) => 
+            setReceivedFiles((prevFiles: any) =>
                 produce(prevFiles, (draftFiles: any) => {
                     const fileIndex = draftFiles?.findIndex((f: any) => f.id === chunkStore.id);
 
-                    if(fileIndex !== -1) {
+                    if (fileIndex !== -1) {
                         draftFiles[fileIndex] = {
                             ...draftFiles[fileIndex],
                             uri: filePath,
@@ -281,10 +298,10 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({ children }) => 
             )
 
             console.log("FILE SAVED SUCCESSFULLY", filePath);
-            
+
         } catch (error) {
             console.error("Error combining chunks or saving file:", error);
-            
+
         }
     }
 
